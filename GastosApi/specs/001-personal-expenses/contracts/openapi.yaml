@@ -1,0 +1,274 @@
+openapi: 3.0.3
+info:
+  title: GastosApi Personal Expenses
+  version: 1.0.0
+  description: API for recording and reviewing authenticated users' personal expenses.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+paths:
+  /expenses:
+    post:
+      operationId: createExpense
+      summary: Create an expense
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateExpenseRequest'
+      responses:
+        '201':
+          description: Expense created.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    get:
+      operationId: listExpenses
+      summary: List expenses with optional filters
+      parameters:
+        - $ref: '#/components/parameters/Category'
+        - name: from
+          in: query
+          description: Inclusive start date (ISO 8601 date).
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: Inclusive end date (ISO 8601 date).
+          schema:
+            type: string
+            format: date
+      responses:
+        '200':
+          description: Matching expenses, scoped to the authenticated user.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Expense'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+  /expenses/summary:
+    get:
+      operationId: getMonthlyExpenseSummary
+      summary: Get exact monthly totals by category
+      parameters:
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+        - name: month
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 12
+      responses:
+        '200':
+          description: Totals for all categories, including categories with no expenses.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MonthlySummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+  /expenses/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      operationId: getExpense
+      summary: Get an expense by identifier
+      responses:
+        '200':
+          description: Expense found for the authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Expense'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+    delete:
+      operationId: deleteExpense
+      summary: Delete an expense
+      responses:
+        '204':
+          description: Expense deleted.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        default:
+          $ref: '#/components/responses/UnexpectedError'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  parameters:
+    Category:
+      name: category
+      in: query
+      description: Filter by one supported expense category.
+      schema:
+        $ref: '#/components/schemas/Category'
+  schemas:
+    Category:
+      type: string
+      enum: [comida, transporte, ocio, otros]
+    CreateExpenseRequest:
+      type: object
+      additionalProperties: false
+      required: [amount, date, category]
+      properties:
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+        date:
+          type: string
+          format: date
+          description: Must not be later than today in the configured business timezone.
+        category:
+          $ref: '#/components/schemas/Category'
+        description:
+          type: string
+          maxLength: 500
+    Expense:
+      type: object
+      required: [id, amount, currencyCode, date, category]
+      properties:
+        id:
+          type: string
+          format: uuid
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+          exclusiveMinimum: true
+        currencyCode:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        date:
+          type: string
+          format: date
+        category:
+          $ref: '#/components/schemas/Category'
+        description:
+          type: string
+          nullable: true
+    CategoryTotal:
+      type: object
+      required: [category, amount]
+      properties:
+        category:
+          $ref: '#/components/schemas/Category'
+        amount:
+          type: number
+          format: decimal
+          minimum: 0
+    MonthlySummary:
+      type: object
+      required: [year, month, currencyCode, totals]
+      properties:
+        year:
+          type: integer
+        month:
+          type: integer
+          minimum: 1
+          maximum: 12
+        currencyCode:
+          type: string
+          pattern: '^[A-Z]{3}$'
+        totals:
+          type: array
+          minItems: 4
+          maxItems: 4
+          items:
+            $ref: '#/components/schemas/CategoryTotal'
+    ProblemDetails:
+      type: object
+      description: RFC 7807 problem response; validation errors may include an errors extension.
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        errors:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              type: string
+  responses:
+    BadRequest:
+      description: Invalid input or validation failure.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    Unauthorized:
+      description: Authentication is required.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    NotFound:
+      description: Expense does not exist or is not accessible to the caller.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+    UnexpectedError:
+      description: Unexpected server error; internal details are not disclosed.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'

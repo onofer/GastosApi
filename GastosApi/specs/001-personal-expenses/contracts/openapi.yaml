@@ -172,7 +172,6 @@ components:
           $ref: '#/components/schemas/Category'
         description:
           type: string
-          maxLength: 500
     Expense:
       type: object
       required: [id, amount, currencyCode, date, category]

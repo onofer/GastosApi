@@ -12,7 +12,7 @@ Represents one personal expense owned by one authenticated user.
 | `CurrencyCode` | ISO 4217 string, SQL `char(3)` | Required; captured from the single configured currency on creation. Currency configuration must not change while records use it without an explicit conversion/migration. |
 | `Date` | `DateOnly` / SQL `date` | Required; may not be later than today in the configured business timezone. |
 | `Category` | English internal enum / SQL string | Required; allowed values map to the API's `comida`, `transporte`, `ocio`, and `otros`. |
-| `Description` | Nullable string | Optional; trim surrounding whitespace; empty/whitespace input is treated as absent. Maximum length: 500 characters. |
+| `Description` | Nullable string | Optional; trim surrounding whitespace; empty/whitespace input is treated as absent. |
 
 ### Invariants
 
